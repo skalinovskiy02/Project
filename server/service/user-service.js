@@ -6,11 +6,18 @@ const tokenService = require('../service/token-service')
 const UserDto = require('../dtos/user-dtos')
 const ApiError = require("../exeptions/api-error");
 
+async function updateUserTokens(user) {
+    const userDto = new UserDto(user);
+    const tokens = tokenService.generateTokens({...userDto});
+    await tokenService.saveToken(userDto.id, tokens.refreshToken);
+    return {...tokens, user: userDto}
+}
+
 class UserService {
 
     async registration(email, password) {
         const candidate = await UserModel.findByEmail(email);
-        if (candidate.rows[0]) {
+        if (candidate) {
             throw ApiError.BadRequest('Пользователь с таким email уже существует.')
         }
 
@@ -18,21 +25,55 @@ class UserService {
         const activationLink = uuid.v4();
 
         const user = await UserModel.create(email, hashPassword, activationLink);
-        await mailService.sendActivationMail(email, activationLink);
-        const userDto = new UserDto(user.rows[0]);
-        const tokens = tokenService.generateTokens({...userDto})
-        await tokenService.saveToken(userDto.id, tokens.refreshToken);
+        await mailService.sendActivationMail(email, `${process.env.API_URL}/api/activate/${activationLink}`);
 
-        return {...tokens, user: userDto}
+        return await updateUserTokens(user)
     }
 
-    async activate(activationLink){
+    async activate(activationLink) {
         const user = await UserModel.findByLink(activationLink);
-        if(!user.rows[0]){
+        if (!user) {
             throw ApiError.BadRequest('Некорректная ссылка активации');
         }
-        user.rows[0].isActivated = true;
-        await UserModel.save(user.rows[0]);
+        user.isActivated = true;
+        return await UserModel.save(user);
+    }
+
+    async login(email, password) {
+        const user = await UserModel.findByEmail(email);
+        if (!user) {
+            throw ApiError.BadRequest('Пользователь с таким email не найден');
+        }
+        const isPassEquals = await bcrypt.compare(password, user.password);
+        if (!isPassEquals) {
+            throw ApiError.BadRequest('Неверный пароль');
+        }
+        return await updateUserTokens(user)
+
+    }
+
+    async logout(refreshToken) {
+        const token = await tokenService.removeToken(refreshToken);
+        return token;
+    }
+
+    async refresh(refreshToken) {
+        if (!refreshToken) {
+            throw ApiError.UnauthorizedError();
+        }
+        const userData = tokenService.validateRefreshToken(refreshToken);
+        const tokenFromDb = await tokenService.findToken(refreshToken);
+        if (!userData || !tokenFromDb) {
+            throw ApiError.UnauthorizedError();
+        }
+
+        const user = await UserModel.findById(userData.id);
+        return await updateUserTokens(user)
+    }
+
+    async getAllUsers() {
+        const users = await UserModel.find();
+        return users;
     }
 
 }
