@@ -1,0 +1,12 @@
+.idea/*
+
+# dependencies
+client/node_modules
+server/node_modules
+.env
+# testing
+/coverage
+
+# production
+client/build
+server/build

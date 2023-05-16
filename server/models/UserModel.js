@@ -1,5 +1,4 @@
 const db = require('../db')
-const findOneQuery = {}
 
 class UserModel {
     async findByEmail(email) {
@@ -40,13 +39,6 @@ class UserModel {
         const answer = await db.query({
             text: 'UPDATE user_model SET isactivated = $1 WHERE id = $2 RETURNING *',
             values: [user.isActivated, user.id]
-        });
-        return answer.rows[0] ? answer.rows[0] : undefined;
-    }
-
-    async find() {
-        const answer = await db.query({
-            text: 'SELECT * FROM user_model'
         });
         return answer.rows[0] ? answer.rows[0] : undefined;
     }

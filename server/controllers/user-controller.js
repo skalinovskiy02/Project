@@ -1,16 +1,19 @@
-const db = require('../db')
 const UserService = require('../service/user-service');
 const {validationResult} = require('express-validator');
 const ApiError = require('../exeptions/api-error')
 
 class UserController {
-    const
 
     async registration(req, res, next) {
         try {
             const errors = validationResult(req)
             if (!errors.isEmpty()) {
-                return next(ApiError.BadRequest('Ошибка при валидации', errors.array()))
+                let msg = 'Ошибка при валидации';
+                if(errors.array()[0].param === 'email')
+                    msg = 'Введите корректный email'
+                if(errors.array()[0].param === 'password')
+                    msg = 'Пароль должен быть от 3 до 30 символов'
+                return next(ApiError.BadRequest(msg, errors.array()))
             }
             const {email, password} = req.body;
             const userData = await UserService.registration(email, password)
@@ -63,16 +66,6 @@ class UserController {
             next(e);
         }
     };
-
-    async getUsers(req, res, next) {
-        try {
-            const users = await UserService.getAllUsers();
-            return res.json(users)
-        } catch (e) {
-            next(e);
-        }
-    };
-
 
 }
 
